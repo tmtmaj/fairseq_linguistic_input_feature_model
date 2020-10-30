@@ -194,7 +194,7 @@ class TransformerModel(FairseqEncoderDecoderModel):
             args.max_target_positions = DEFAULT_MAX_TARGET_POSITIONS
 
         src_dict, tgt_dict = task.source_dictionary, task.target_dictionary
-        feature_dict = task.target_dictionary
+        feature_dict = task.feature_dictionary
         
         
         if args.share_all_embeddings:
@@ -245,8 +245,9 @@ class TransformerModel(FairseqEncoderDecoderModel):
         return emb
 
     @classmethod
-    def build_encoder(cls, args, src_dict, feature_dict, embed_tokens):
-        return TransformerEncoder(args, src_dict, feature_dict, embed_tokens)
+    def build_encoder(cls, args, src_dict, feature_dict, embed_tokens, feature_embed_tokens):
+        
+        return TransformerEncoder(args, src_dict, feature_dict, embed_tokens, feature_embed_tokens)
 
     @classmethod
     def build_decoder(cls, args, tgt_dict, embed_tokens):
@@ -378,10 +379,10 @@ class TransformerEncoder(FairseqEncoder):
 
     def forward_embedding(self, src_tokens, feature_tokens):
         # embed tokens and positions
-        x = embed = torch.cat((self.embed_tokens(src_tokens), self.feature_embed_tokens(features)),-1)
-        position_x = x[0]
+        x = embed = torch.cat((self.embed_tokens(src_tokens), self.feature_embed_tokens(feature_tokens)),-1)
+        
         if self.embed_positions is not None:
-            x = embed + self.embed_positions(position_x)
+            x = embed + self.embed_positions(embed[:,:,0])
         if self.layernorm_embedding is not None:
             x = self.layernorm_embedding(x)
         x = F.dropout(x, p=self.dropout, training=self.training)
@@ -415,10 +416,19 @@ class TransformerEncoder(FairseqEncoder):
         # print("features.shape",features.shape) #features.shape torch.Size([64, 44])
         # exit()
         
-        for a,b in zip(src_tokens, features):
-            print(self.src_dict.string(a))
-            print(self.feature_dict.string(b))
+        # for a,b in zip(src_tokens, features):
+            # print(self.src_dict.string(a))
+            # print(self.feature_dict.string(b))
+            # print()
             
+        # exit()
+        
+        # economic 활 력 둔화 로 growth 률 이 1분 기에 전 분기 compared - 0.3% 를 record 하고 , 각 institutions 이 year growth 전 망치 를 2% 초반 대로 낮추고 as 금리 increase 은 쉽지 않다는 analysis 이 지배 적 was .
+        # <rep> <ori> <ori> <ori> <ori> <rep> <ori> <ori> <ori> <ori> <ori> <ori> <rep> <ori> <ori> <ori> <rep> <ori> <ori> <ori> <rep> <ori> <rep> <rep> <ori> <ori> <ori> <ori> <ori> <ori> <ori> <rep> <ori> <rep> <ori> <ori> <ori> <rep> <ori> <ori> <ori> <rep> <ori>
+
+        # government 는 주@@ 씨 가 피@@ 랍@@ was since 외교부 와 국방부 , 국가정보원 을 on 으로 tf 를 consists by 리비아 government 와 u.s. 프랑스 , 영국 government as 과 공조 by 주@@ 씨 의 신변 safety 에 나선 has is .
+        # <rep> <ori> <ori> <ori> <ori> <ori> <ori> <rep> <rep> <ori> <ori> <ori> <ori> <ori> <ori> <rep> <ori> <ori> <ori> <rep> <rep> <ori> <rep> <ori> <rep> <ori> <ori> <ori> <rep> <rep> <ori> <ori> <rep> <ori> <ori> <ori> <ori> <rep> <ori> <ori> <rep> <rep> <ori>
+
         x, encoder_embedding = self.forward_embedding(src_tokens, features)
 
         # B x T x C -> T x B x C
