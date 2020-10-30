@@ -36,9 +36,10 @@ def load_langpair_dataset(
     data_path, split,
     src, src_dict,
     tgt, tgt_dict,
+    feature_dict,
     combine, dataset_impl, upsample_primary,
     left_pad_source, left_pad_target, max_source_positions,
-    max_target_positions, prepend_bos=False, load_alignments=False,
+    max_target_positions, prepend_bos=False, load_features=False, load_alignments=False,
     truncate_source=False, append_source_id=False,
     num_buckets=0,
 ):
@@ -118,6 +119,15 @@ def load_langpair_dataset(
         align_path = os.path.join(data_path, '{}.align.{}-{}'.format(split, src, tgt))
         if indexed_dataset.dataset_exists(align_path, impl=dataset_impl):
             align_dataset = data_utils.load_indexed_dataset(align_path, None, dataset_impl)
+            
+    # print("feature_dict", feature_dict.symbols, feature_dict.count) #feature_dict ['<s>', '<pad>', '</s>', '<unk>', '<ori>', '<rep>', 'madeupword0000', 'madeupword0001'] [1, 1, 1, 1, 18558611, 5354704, 0, 0]
+
+            
+    feature_dataset = None
+    if load_features:
+        feature_path = os.path.join(data_path, '{}.feature.{}-{}.{}'.format(split, src, tgt,src))
+        if indexed_dataset.dataset_exists(feature_path, impl=dataset_impl):
+            feature_dataset = data_utils.load_indexed_dataset(feature_path, feature_dict, dataset_impl)
 
     tgt_dataset_sizes = tgt_dataset.sizes if tgt_dataset is not None else None
     return LanguagePairDataset(
@@ -125,6 +135,7 @@ def load_langpair_dataset(
         tgt_dataset, tgt_dataset_sizes, tgt_dict,
         left_pad_source=left_pad_source,
         left_pad_target=left_pad_target,
+        feature_dataset=feature_dataset,
         align_dataset=align_dataset, eos=eos,
         num_buckets=num_buckets,
     )
@@ -162,6 +173,8 @@ class TranslationTask(FairseqTask):
                             help='source language')
         parser.add_argument('-t', '--target-lang', default=None, metavar='TARGET',
                             help='target language')
+        parser.add_argument('--load-features', action='store_true',
+                            help='load the binarized alignments')
         parser.add_argument('--load-alignments', action='store_true',
                             help='load the binarized alignments')
         parser.add_argument('--left-pad-source', default='True', type=str, metavar='BOOL',
@@ -202,10 +215,11 @@ class TranslationTask(FairseqTask):
                             help='print sample generations during validation')
         # fmt: on
 
-    def __init__(self, args, src_dict, tgt_dict):
+    def __init__(self, args, src_dict, tgt_dict, feature_dict):
         super().__init__(args)
         self.src_dict = src_dict
         self.tgt_dict = tgt_dict
+        self.feature_dict = feature_dict
 
     @classmethod
     def setup_task(cls, args, **kwargs):
@@ -233,8 +247,12 @@ class TranslationTask(FairseqTask):
         assert src_dict.unk() == tgt_dict.unk()
         logger.info('[{}] dictionary: {} types'.format(args.source_lang, len(src_dict)))
         logger.info('[{}] dictionary: {} types'.format(args.target_lang, len(tgt_dict)))
+        
+        feature_dict = cls.load_dictionary(os.path.join(paths[0], 'dict.feature.txt'))
+        
+        logger.info('[{}] dictionary: {} types'.format("feature", len(feature_dict)))
 
-        return cls(args, src_dict, tgt_dict)
+        return cls(args, src_dict, tgt_dict, feature_dict)
 
     def load_dataset(self, split, epoch=1, combine=False, **kwargs):
         """Load a given dataset split.
@@ -251,12 +269,14 @@ class TranslationTask(FairseqTask):
 
         self.datasets[split] = load_langpair_dataset(
             data_path, split, src, self.src_dict, tgt, self.tgt_dict,
+            self.feature_dict,
             combine=combine, dataset_impl=self.args.dataset_impl,
             upsample_primary=self.args.upsample_primary,
             left_pad_source=self.args.left_pad_source,
             left_pad_target=self.args.left_pad_target,
             max_source_positions=self.args.max_source_positions,
             max_target_positions=self.args.max_target_positions,
+            load_features=self.args.load_features,
             load_alignments=self.args.load_alignments,
             truncate_source=self.args.truncate_source,
             num_buckets=self.args.num_batch_buckets,

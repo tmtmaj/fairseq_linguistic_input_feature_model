@@ -114,7 +114,8 @@ def main(args):
         feature_dict = build_dictionary(
                 [args.trainpref +"." + args.feature_suffix], src=True
             ) # /content/drive/My Drive/word_substitution_koen/TRAN_replace_koen/train.feature
-
+        feature_dict.save(dict_path("feature"))
+        
     def make_binary_dataset(vocab, input_prefix, output_prefix, lang, num_workers):
         logger.info("[{}] Dictionary: {} types".format(lang, len(vocab)))
         n_seq_tok = [0, 0]
