@@ -368,6 +368,11 @@ class TranslationTask(FairseqTask):
     def target_dictionary(self):
         """Return the target :class:`~fairseq.data.Dictionary`."""
         return self.tgt_dict
+        
+    @property
+    def feature_dictionary(self):
+        """Return the target :class:`~fairseq.data.Dictionary`."""
+        return self.feature_dict
 
     def _inference_with_bleu(self, generator, sample, model):
         import sacrebleu

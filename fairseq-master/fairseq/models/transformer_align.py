@@ -46,8 +46,8 @@ class TransformerAlignModel(TransformerModel):
             transformer_model.encoder, transformer_model.decoder, args
         )
 
-    def forward(self, src_tokens, src_lengths, prev_output_tokens):
-        encoder_out = self.encoder(src_tokens, src_lengths)
+    def forward(self, src_tokens, src_lengths, features, prev_output_tokens):
+        encoder_out = self.encoder(src_tokens, src_lengths, features)
         return self.forward_decoder(prev_output_tokens, encoder_out)
 
     def forward_decoder(

@@ -108,6 +108,8 @@ class TransformerModel(FairseqEncoderDecoderModel):
                             help='path to pre-trained encoder embedding')
         parser.add_argument('--encoder-embed-dim', type=int, metavar='N',
                             help='encoder embedding dimension')
+        parser.add_argument('--feature-embed-dim', type=int, metavar='N',
+                            help='feature embedding dimension')
         parser.add_argument('--encoder-ffn-embed-dim', type=int, metavar='N',
                             help='encoder embedding dimension for FFN')
         parser.add_argument('--encoder-layers', type=int, metavar='N',
@@ -192,7 +194,9 @@ class TransformerModel(FairseqEncoderDecoderModel):
             args.max_target_positions = DEFAULT_MAX_TARGET_POSITIONS
 
         src_dict, tgt_dict = task.source_dictionary, task.target_dictionary
-
+        feature_dict = task.target_dictionary
+        
+        
         if args.share_all_embeddings:
             if src_dict != tgt_dict:
                 raise ValueError("--share-all-embeddings requires a joined dictionary")
@@ -213,13 +217,18 @@ class TransformerModel(FairseqEncoderDecoderModel):
             args.share_decoder_input_output_embed = True
         else:
             encoder_embed_tokens = cls.build_embedding(
-                args, src_dict, args.encoder_embed_dim, args.encoder_embed_path
+                args, src_dict, (args.encoder_embed_dim - args.feature_embed_dim), args.encoder_embed_path
             )
             decoder_embed_tokens = cls.build_embedding(
                 args, tgt_dict, args.decoder_embed_dim, args.decoder_embed_path
             )
+            
+        feature_embed_tokens  = cls.build_embedding(
+                args, feature_dict, args.feature_embed_dim, None
+            )  
+        
 
-        encoder = cls.build_encoder(args, src_dict, encoder_embed_tokens)
+        encoder = cls.build_encoder(args, src_dict, feature_dict, encoder_embed_tokens, feature_embed_tokens)
         decoder = cls.build_decoder(args, tgt_dict, decoder_embed_tokens)
         return cls(args, encoder, decoder)
 
@@ -236,8 +245,8 @@ class TransformerModel(FairseqEncoderDecoderModel):
         return emb
 
     @classmethod
-    def build_encoder(cls, args, src_dict, embed_tokens):
-        return TransformerEncoder(args, src_dict, embed_tokens)
+    def build_encoder(cls, args, src_dict, feature_dict, embed_tokens):
+        return TransformerEncoder(args, src_dict, feature_dict, embed_tokens)
 
     @classmethod
     def build_decoder(cls, args, tgt_dict, embed_tokens):
@@ -254,6 +263,7 @@ class TransformerModel(FairseqEncoderDecoderModel):
         self,
         src_tokens,
         src_lengths,
+        features,
         prev_output_tokens,
         return_all_hiddens: bool = True,
         features_only: bool = False,
@@ -267,7 +277,7 @@ class TransformerModel(FairseqEncoderDecoderModel):
         which are not supported by TorchScript.
         """
         encoder_out = self.encoder(
-            src_tokens, src_lengths=src_lengths, return_all_hiddens=return_all_hiddens
+            src_tokens, src_lengths=src_lengths, features=features, return_all_hiddens=return_all_hiddens
         )
         decoder_out = self.decoder(
             prev_output_tokens,
@@ -305,21 +315,26 @@ class TransformerEncoder(FairseqEncoder):
         embed_tokens (torch.nn.Embedding): input embedding
     """
 
-    def __init__(self, args, dictionary, embed_tokens):
+    def __init__(self, args, dictionary, feature_dict, embed_tokens, feature_embed_tokens):
         super().__init__(dictionary)
         self.register_buffer("version", torch.Tensor([3]))
-
+        
+        self.src_dict = dictionary
+        self.feature_dict = feature_dict
+        
         self.dropout = args.dropout
         self.encoder_layerdrop = args.encoder_layerdrop
 
-        embed_dim = embed_tokens.embedding_dim
+        embed_dim = embed_tokens.embedding_dim + feature_embed_tokens.embedding_dim
         self.padding_idx = embed_tokens.padding_idx
         self.max_source_positions = args.max_source_positions
 
         self.embed_tokens = embed_tokens
+        self.feature_embed_tokens = feature_embed_tokens
 
-        self.embed_scale = 1.0 if args.no_scale_embedding else math.sqrt(embed_dim)
-
+        # self.embed_scale = 1.0 if args.no_scale_embedding else math.sqrt(embed_dim)
+        self.embed_scale = 1.0
+        
         self.embed_positions = (
             PositionalEmbedding(
                 args.max_source_positions,
@@ -361,11 +376,12 @@ class TransformerEncoder(FairseqEncoder):
     def build_encoder_layer(self, args):
         return TransformerEncoderLayer(args)
 
-    def forward_embedding(self, src_tokens):
+    def forward_embedding(self, src_tokens, feature_tokens):
         # embed tokens and positions
-        x = embed = self.embed_scale * self.embed_tokens(src_tokens)
+        x = embed = torch.cat((self.embed_tokens(src_tokens), self.feature_embed_tokens(features)),-1)
+        position_x = x[0]
         if self.embed_positions is not None:
-            x = embed + self.embed_positions(src_tokens)
+            x = embed + self.embed_positions(position_x)
         if self.layernorm_embedding is not None:
             x = self.layernorm_embedding(x)
         x = F.dropout(x, p=self.dropout, training=self.training)
@@ -373,7 +389,7 @@ class TransformerEncoder(FairseqEncoder):
             x = self.quant_noise(x)
         return x, embed
 
-    def forward(self, src_tokens, src_lengths, return_all_hiddens: bool = False):
+    def forward(self, src_tokens, src_lengths, features, return_all_hiddens: bool = False):
         """
         Args:
             src_tokens (LongTensor): tokens in the source language of shape
@@ -395,7 +411,15 @@ class TransformerEncoder(FairseqEncoder):
                   hidden states of shape `(src_len, batch, embed_dim)`.
                   Only populated if *return_all_hiddens* is True.
         """
-        x, encoder_embedding = self.forward_embedding(src_tokens)
+        
+        # print("features.shape",features.shape) #features.shape torch.Size([64, 44])
+        # exit()
+        
+        for a,b in zip(src_tokens, features):
+            print(self.src_dict.string(a))
+            print(self.feature_dict.string(b))
+            
+        x, encoder_embedding = self.forward_embedding(src_tokens, features)
 
         # B x T x C -> T x B x C
         x = x.transpose(0, 1)
