@@ -175,7 +175,11 @@ class TransformerModel(FairseqEncoderDecoderModel):
         parser.add_argument('--quant-noise-scalar', type=float, metavar='D', default=0,
                             help='scalar quantization noise and scalar quantization at training time')
         # fmt: on
-
+        
+        parser.add_argument('--feature-embed-dim', type=int, metavar='N',
+                            help='feature embedding dimension')
+        parser.add_argument('--feature-merge', default=None, action='store_true',
+                            help='feature merging method')
     @classmethod
     def build_model(cls, args, task):
         """Build a new model instance."""
@@ -196,6 +200,27 @@ class TransformerModel(FairseqEncoderDecoderModel):
         src_dict, tgt_dict = task.source_dictionary, task.target_dictionary
         feature_dict = task.feature_dictionary
         
+        if args.feature_merge == "concat":
+        
+            feature_embed_dim = getattr(args, "feature_embed_dim", min(128, int(feature_dict.__len__()*0.7) + (8 - int(feature_dict.__len__()*0.7)% 8)))
+            
+            setattr(args, "encoder_embed_dim", args.encoder_embed_dim + feature_embed_dim)
+            setattr(args, "decoder_embed_dim", args.dcoder_embed_dim + feature_embed_dim)
+            
+            en
+        elif args.feature_merge == "average":
+        
+            feature_embed_dim = args.encoder_embed_dim
+        
+        elif args.feature_merge == "gate"：
+            
+            feature_embed_dim = args.encoder_embed_dim
+            
+        elif args.feature_merge is not None:
+            raise ValueError(
+                    "correct featrue merge"
+                    )
+
         
         if args.share_all_embeddings:
             if src_dict != tgt_dict:
@@ -216,15 +241,22 @@ class TransformerModel(FairseqEncoderDecoderModel):
             decoder_embed_tokens = encoder_embed_tokens
             args.share_decoder_input_output_embed = True
         else:
-            encoder_embed_tokens = cls.build_embedding(
-                args, src_dict, (args.encoder_embed_dim - args.feature_embed_dim), args.encoder_embed_path
-            )
+        
+            if args.feature_merge == "concat":
+                encoder_embed_tokens = cls.build_embedding(
+                    args, src_dict, (args.encoder_embed_dim - feature_embed_dim), args.encoder_embed_path
+                )
+            else:
+                encoder_embed_tokens = cls.build_embedding(
+                    args, src_dict, (args.encoder_embed_dim), args.encoder_embed_path
+                )
+                
             decoder_embed_tokens = cls.build_embedding(
-                args, tgt_dict, args.decoder_embed_dim, args.decoder_embed_path
+                args, tgt_dict, (args.decoder_embed_dim), args.decoder_embed_path
             )
             
         feature_embed_tokens  = cls.build_embedding(
-                args, feature_dict, args.feature_embed_dim, None
+                args, feature_dict, feature_embed_dim, None
             )  
         
 
