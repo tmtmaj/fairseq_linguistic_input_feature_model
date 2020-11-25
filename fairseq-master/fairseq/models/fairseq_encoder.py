@@ -59,6 +59,7 @@ class FairseqEncoder(nn.Module):
             for k, v in net_input.items()
             if k != "prev_output_tokens"
         }
+        # print(encoder_input.keys())
         return self.forward(**encoder_input)
 
     def reorder_encoder_out(self, encoder_out, new_order):

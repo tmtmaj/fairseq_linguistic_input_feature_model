@@ -204,9 +204,8 @@ class TransformerModel(FairseqEncoderDecoderModel):
             feature_embed_dim = getattr(args, "feature_embed_dim", min(128, int(feature_dict.__len__()*0.7) + (8 - int(feature_dict.__len__()*0.7)% 8)))
             
             setattr(args, "encoder_embed_dim", args.encoder_embed_dim + feature_embed_dim)
-            setattr(args, "decoder_embed_dim", args.dcoder_embed_dim + feature_embed_dim)
-            
-            en
+            setattr(args, "decoder_embed_dim", args.decoder_embed_dim + feature_embed_dim)
+
         elif args.feature_merge == "add":
         
             feature_embed_dim = args.encoder_embed_dim
@@ -219,7 +218,8 @@ class TransformerModel(FairseqEncoderDecoderModel):
             raise ValueError(
                     "correct featrue merge"
                     )
-
+        else:
+            feature_embed_dim =None
         
         if args.share_all_embeddings:
             if src_dict != tgt_dict:
@@ -254,13 +254,18 @@ class TransformerModel(FairseqEncoderDecoderModel):
                 args, tgt_dict, (args.decoder_embed_dim), args.decoder_embed_path
             )
             
-        feature_embed_tokens  = cls.build_embedding(
-                args, feature_dict, feature_embed_dim, None
-            )  
+        if feature_dict != None:
+            feature_embed_tokens  = cls.build_embedding(
+                    args, feature_dict, feature_embed_dim, None
+                )  
+        else:
+            feature_embed_tokens = None
         
 
         encoder = cls.build_encoder(args, src_dict, feature_dict, encoder_embed_tokens, feature_embed_tokens)
         decoder = cls.build_decoder(args, tgt_dict, decoder_embed_tokens)
+        
+        # print(encoder)
         return cls(args, encoder, decoder)
 
     @classmethod
@@ -276,7 +281,7 @@ class TransformerModel(FairseqEncoderDecoderModel):
         return emb
 
     @classmethod
-    def build_encoder(cls, args, src_dict, feature_dict, embed_tokens, feature_embed_tokens):
+    def build_encoder(cls, args, src_dict, feature_dict, embed_tokens, feature_embed_tokens ):
         
         return TransformerEncoder(args, src_dict, feature_dict, embed_tokens, feature_embed_tokens)
 
@@ -295,8 +300,8 @@ class TransformerModel(FairseqEncoderDecoderModel):
         self,
         src_tokens,
         src_lengths,
-        features,
         prev_output_tokens,
+        features = None,
         return_all_hiddens: bool = True,
         features_only: bool = False,
         alignment_layer: Optional[int] = None,
@@ -308,9 +313,14 @@ class TransformerModel(FairseqEncoderDecoderModel):
         Copied from the base class, but without ``**kwargs``,
         which are not supported by TorchScript.
         """
-        encoder_out = self.encoder(
-            src_tokens, src_lengths=src_lengths, features=features, return_all_hiddens=return_all_hiddens
-        )
+        if features is not None:
+            encoder_out = self.encoder(
+                src_tokens, src_lengths=src_lengths, features=features, return_all_hiddens=return_all_hiddens
+            )
+        else:
+            encoder_out = self.encoder(
+                src_tokens, src_lengths=src_lengths,  return_all_hiddens=return_all_hiddens
+            )
         decoder_out = self.decoder(
             prev_output_tokens,
             encoder_out=encoder_out,
@@ -362,6 +372,7 @@ class TransformerEncoder(FairseqEncoder):
             embed_dim = embed_tokens.embedding_dim +feature_embed_tokens.embedding_dim
         else:
             embed_dim = embed_tokens.embedding_dim
+            
         self.padding_idx = embed_tokens.padding_idx
         self.max_source_positions = args.max_source_positions
 
@@ -435,10 +446,15 @@ class TransformerEncoder(FairseqEncoder):
             x = embed = self.gate(self.embed_tokens(src_tokens), self.feature_embed_tokens(feature_tokens))
         else:
             x = embed =self.embed_tokens(src_tokens)
+            # print("x", x.shape)
             
             
         if self.embed_positions is not None:
-            x = embed + self.embed_positions(embed[:,:,0])
+            if self.merging_method is not None:
+                x = embed + self.embed_positions(embed[:,:,0])
+            else:
+                x = embed + self.embed_positions(src_tokens)
+            
         if self.layernorm_embedding is not None:
             x = self.layernorm_embedding(x)
         x = F.dropout(x, p=self.dropout, training=self.training)
@@ -446,7 +462,7 @@ class TransformerEncoder(FairseqEncoder):
             x = self.quant_noise(x)
         return x, embed
 
-    def forward(self, src_tokens, src_lengths, features, return_all_hiddens: bool = False):
+    def forward(self, src_tokens, src_lengths, features =None, return_all_hiddens: bool = False):
         """
         Args:
             src_tokens (LongTensor): tokens in the source language of shape

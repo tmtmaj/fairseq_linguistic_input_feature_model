@@ -130,6 +130,8 @@ def collate(
         feature_tokens = merge('feature', left_pad=left_pad_source)
         feature_tokens = feature_tokens.index_select(0, sort_order)
         batch['net_input']['features'] = feature_tokens
+    else:
+        batch['net_input']['features'] = None
         
         # print(batch['feature'].shape, batch['net_input']['src_tokens'].shape) #torch.Size([64, 44]) torch.Size([64, 44])
         

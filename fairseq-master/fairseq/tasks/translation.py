@@ -248,9 +248,13 @@ class TranslationTask(FairseqTask):
         logger.info('[{}] dictionary: {} types'.format(args.source_lang, len(src_dict)))
         logger.info('[{}] dictionary: {} types'.format(args.target_lang, len(tgt_dict)))
         
-        feature_dict = cls.load_dictionary(os.path.join(paths[0], 'dict.feature.txt'))
+        if args.load_features:
+            feature_dict = cls.load_dictionary(os.path.join(paths[0], 'dict.feature.txt'))
+            logger.info('[{}] dictionary: {} types'.format("feature", len(feature_dict)))
+        else:
+            feature_dict = None
         
-        logger.info('[{}] dictionary: {} types'.format("feature", len(feature_dict)))
+        
 
         return cls(args, src_dict, tgt_dict, feature_dict)
 
