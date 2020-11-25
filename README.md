@@ -13,7 +13,7 @@ cd fairseq
 pip install --editable ./
 ```
 
-Implemention env 
+My implemention env 
 
 Python Python 3.6.9 on linux  
 Pytorch 1.7.0+cu101
