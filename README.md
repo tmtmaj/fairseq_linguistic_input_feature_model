@@ -53,13 +53,13 @@ Noun Noun Josa Verb Noun Josa Noun Josa Adjective Adjective Noun Josa Adjective 
 Then preprocess data using fairseq-py:
 
 ```
-python /fairseq_linguistic_input_feature_model/fairseq-master/fairseq_cli/preprocess.py \
+python /fairseq_linguistic_input_feature_model/fairseq_cli/preprocess.py \
     --source-lang ko --target-lang en \
-    --trainpref /fairseq_linguistic_input_feature_model/fairseq-master/tutorial_dataset/train \
-    --validpref /fairseq_linguistic_input_feature_model/fairseq-master/tutorial_dataset/valid \
-    --testpref /fairseq_linguistic_input_feature_model/fairseq-master/tutorial_dataset/test \
+    --trainpref /fairseq_linguistic_input_feature_model/tutorial_dataset/train \
+    --validpref /fairseq_linguistic_input_feature_model/tutorial_dataset/valid \
+    --testpref /fairseq_linguistic_input_feature_model/tutorial_dataset/test \
     --feature-suffix feature \
-    --destdir /fairseq_linguistic_input_feature_model/fairseq-master/tutorial_dataset/fairseq_prepro_bpe \
+    --destdir /fairseq_linguistic_input_feature_model/tutorial_dataset/fairseq_prepro_bpe \
     --workers 32
 
 ```
@@ -69,25 +69,25 @@ python /fairseq_linguistic_input_feature_model/fairseq-master/fairseq_cli/prepro
 train model using fairseq-py
 
 ```
-python /fairseq_linguistic_input_feature_model/fairseq-master/fairseq_cli/train.py \
-     /fairseq_linguistic_input_feature_model/fairseq-master/tutorial_dataset/fairseq_prepro_bpe \
+python /fairseq_linguistic_input_feature_model/fairseq_cli/train.py \
+     /fairseq_linguistic_input_feature_model/tutorial_dataset/fairseq_prepro_bpe \
     --arch transformer --optimizer adam --adam-betas '(0.9, 0.98)' --clip-norm 0.0 --activation-fn relu\
     --lr 0.0007 --lr-scheduler inverse_sqrt --warmup-updates 4000 --warmup-init-lr 1e-07 \
     --dropout 0.3 --attention-dropout 0.1 --weight-decay 0.0 --max-tokens 3500 --label-smoothing 0.1 \
-    --save-dir  /fairseq_linguistic_input_feature_model/fairseq-master/tutorial_dataset/  --log-interval 200 --max-epoch 30 \
+    --save-dir  /fairseq_linguistic_input_feature_model/tutorial_dataset/  --log-interval 200 --max-epoch 30 \
     --keep-interval-updates -1 --save-interval-updates 0 --criterion label_smoothed_cross_entropy --update-freq 8 \
     --load-features  --feature-merge "concat" \
-    | tee -a  /fairseq_linguistic_input_feature_model/fairseq-master/tutorial_dataset/training.log \
+    | tee -a  /fairseq_linguistic_input_feature_model/tutorial_dataset/training.log \
 ```
 
 ## Translate
 
 ```
-python /fairseq_linguistic_input_feature_model/fairseq-master/fairseq_cli/generate.py \
-    /fairseq_linguistic_input_feature_model/fairseq-master/tutorial_dataset/fairseq_prepro_bpe \
+python /fairseq_linguistic_input_feature_modelfairseq_cli/generate.py \
+    /fairseq_linguistic_input_feature_model/tutorial_dataset/fairseq_prepro_bpe \
      --gen-subset test  --load-features \
     --source-lang ko --target-lang en \
-    --path /fairseq_linguistic_input_feature_model/fairseq-master/tutorial_dataset/checkpoint_last.pt --beam 5 --nbest 1 --quiet 
+    --path /fairseq_linguistic_input_feature_model/tutorial_dataset/checkpoint_last.pt --beam 5 --nbest 1 --quiet 
 ```
 
 The important options we add:
@@ -104,28 +104,28 @@ Possible choices: concat, add, gate  Default: None
 ## Train a vanilla NMT model
 
 ```
-python /fairseq_linguistic_input_feature_model/fairseq-master/fairseq_cli/preprocess.py \
+python /fairseq_linguistic_input_feature_model/fairseq_cli/preprocess.py \
     --source-lang ko --target-lang en \
-    --trainpref /fairseq_linguistic_input_feature_model/fairseq-master/tutorial_dataset/train \
-    --validpref /fairseq_linguistic_input_feature_model/fairseq-master/tutorial_dataset/valid \
-    --testpref /fairseq_linguistic_input_feature_model/fairseq-master/tutorial_dataset/test \
-    --destdir /fairseq_linguistic_input_feature_model/fairseq-master/tutorial_dataset/fairseq_prepro_bpe \
+    --trainpref /fairseq_linguistic_input_feature_model/tutorial_dataset/train \
+    --validpref /fairseq_linguistic_input_feature_model/tutorial_dataset/valid \
+    --testpref /fairseq_linguistic_input_feature_model/tutorial_dataset/test \
+    --destdir /fairseq_linguistic_input_feature_model/tutorial_dataset/fairseq_prepro_bpe \
     --workers 32
     
-python /fairseq_linguistic_input_feature_model/fairseq-master/fairseq_cli/train.py \
-     /fairseq_linguistic_input_feature_model/fairseq-master/tutorial_dataset/fairseq_prepro_bpe \
+python /fairseq_linguistic_input_feature_model/fairseq_cli/train.py \
+     /fairseq_linguistic_input_feature_model/tutorial_dataset/fairseq_prepro_bpe \
     --arch transformer --optimizer adam --adam-betas '(0.9, 0.98)' --clip-norm 0.0 --activation-fn relu\
     --lr 0.0007 --lr-scheduler inverse_sqrt --warmup-updates 4000 --warmup-init-lr 1e-07 \
     --dropout 0.3 --attention-dropout 0.1 --weight-decay 0.0 --max-tokens 3500 --label-smoothing 0.1 \
-    --save-dir  /fairseq_linguistic_input_feature_model/fairseq-master/tutorial_dataset/  --log-interval 200 --max-epoch 30 \
+    --save-dir  /fairseq_linguistic_input_feature_model/tutorial_dataset/  --log-interval 200 --max-epoch 30 \
     --keep-interval-updates -1 --save-interval-updates 0 --criterion label_smoothed_cross_entropy --update-freq 8 \
-    | tee -a  /fairseq_linguistic_input_feature_model/fairseq-master/tutorial_dataset/training.log \
+    | tee -a  /fairseq_linguistic_input_feature_model/tutorial_dataset/training.log \
     
 python /fairseq_linguistic_input_feature_model/fairseq-master/fairseq_cli/generate.py \
-    /fairseq_linguistic_input_feature_model/fairseq-master/tutorial_dataset/fairseq_prepro_bpe \
+    /fairseq_linguistic_input_feature_model/tutorial_dataset/fairseq_prepro_bpe \
      --gen-subset test  \
     --source-lang ko --target-lang en \
-    --path /fairseq_linguistic_input_feature_model/fairseq-master/tutorial_dataset/checkpoint_last.pt --beam 5 --nbest 1 --quiet 
+    --path /fairseq_linguistic_input_feature_model/tutorial_dataset/checkpoint_last.pt --beam 5 --nbest 1 --quiet 
 
 ```
 
