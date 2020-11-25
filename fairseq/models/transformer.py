@@ -199,13 +199,16 @@ class TransformerModel(FairseqEncoderDecoderModel):
         src_dict, tgt_dict = task.source_dictionary, task.target_dictionary
         feature_dict = task.feature_dictionary
         
-        if args.feature_merge == "concat":
         
-            feature_embed_dim = getattr(args, "feature_embed_dim", min(128, int(feature_dict.__len__()*0.7) + (8 - int(feature_dict.__len__()*0.7)% 8)))
+        
+        if args.feature_merge == "concat":
             
-            setattr(args, "encoder_embed_dim", args.encoder_embed_dim + feature_embed_dim)
-            setattr(args, "decoder_embed_dim", args.decoder_embed_dim + feature_embed_dim)
-
+            
+            feature_embed_dim = getattr(args, "feature_embed_dim", min(128, int(feature_dict.__len__()*0.7) + (8 - int(feature_dict.__len__()*0.7)% 8)))
+            if args.encoder_embed_dim == 512:
+                setattr(args, "encoder_embed_dim", args.encoder_embed_dim+feature_embed_dim)
+                setattr(args, "decoder_embed_dim", args.decoder_embed_dim+feature_embed_dim)
+            
         elif args.feature_merge == "add":
         
             feature_embed_dim = args.encoder_embed_dim
