@@ -131,7 +131,7 @@ python /fairseq_linguistic_input_feature_model/fairseq-master/fairseq_cli/genera
 
 # Reference
 
-```
+```bibtex
 @inproceedings{sennrich-haddow-2016-linguistic,
     title = "Linguistic Input Features Improve Neural Machine Translation",
     author = "Sennrich, Rico  and
