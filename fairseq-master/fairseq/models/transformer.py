@@ -254,7 +254,7 @@ class TransformerModel(FairseqEncoderDecoderModel):
                 args, tgt_dict, (args.decoder_embed_dim), args.decoder_embed_path
             )
             
-        if feature_dict != None:
+        if feature_dict is not None:
             feature_embed_tokens  = cls.build_embedding(
                     args, feature_dict, feature_embed_dim, None
                 )  
