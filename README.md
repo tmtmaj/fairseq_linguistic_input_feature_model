@@ -20,7 +20,7 @@ Pytorch 1.7.0+cu101
 
 # Tutorial 
 
-#### Data preprocess
+## Data preprocess
 
 we introduce the Korean-to-English translation where the NMT input is augmented with part-of-speech(POS) tags.
 
@@ -64,7 +64,7 @@ python /fairseq_linguistic_input_feature_model/fairseq-master/fairseq_cli/prepro
 
 ```
 
-#### Model Train
+## Model Train
 
 train model using fairseq-py
 
@@ -80,7 +80,7 @@ python /fairseq_linguistic_input_feature_model/fairseq-master/fairseq_cli/train.
     | tee -a  /fairseq_linguistic_input_feature_model/fairseq-master/tutorial_dataset/training.log \
 ```
 
-#### Translate
+## Translate
 
 ```
 python /fairseq_linguistic_input_feature_model/fairseq-master/fairseq_cli/generate.py \
@@ -101,7 +101,7 @@ group.add_argument("--feature-suffix", metavar="FP", default=None, help="feature
 `--feature-merge` Merge action for incorporating linguistic input features embeddings.  
 Possible choices: concat, add, gate  Default: None
 
-#### Train a vanilla NMT model
+## Train a vanilla NMT model
 
 ```
 python /fairseq_linguistic_input_feature_model/fairseq-master/fairseq_cli/preprocess.py \
