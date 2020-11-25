@@ -128,3 +128,28 @@ python /fairseq_linguistic_input_feature_model/fairseq-master/fairseq_cli/genera
     --path /fairseq_linguistic_input_feature_model/fairseq-master/tutorial_dataset/checkpoint_last.pt --beam 5 --nbest 1 --quiet 
 
 ```
+
+# Reference
+
+```
+@inproceedings{sennrich-haddow-2016-linguistic,
+    title = "Linguistic Input Features Improve Neural Machine Translation",
+    author = "Sennrich, Rico  and
+      Haddow, Barry",
+    booktitle = "Proceedings of the First Conference on Machine Translation: Volume 1, Research Papers",
+    month = aug,
+    year = "2016",
+    address = "Berlin, Germany",
+    publisher = "Association for Computational Linguistics",
+    url = "https://www.aclweb.org/anthology/W16-2209",
+    doi = "10.18653/v1/W16-2209",
+    pages = "83--91",
+}
+
+@inproceedings{ott2019fairseq,
+  title = {fairseq: A Fast, Extensible Toolkit for Sequence Modeling},
+  author = {Myle Ott and Sergey Edunov and Alexei Baevski and Angela Fan and Sam Gross and Nathan Ng and David Grangier and Michael Auli},
+  booktitle = {Proceedings of NAACL-HLT 2019: Demonstrations},
+  year = {2019},
+}
+```
