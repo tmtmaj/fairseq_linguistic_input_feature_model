@@ -108,6 +108,7 @@ class TransformerModel(FairseqEncoderDecoderModel):
                             help='path to pre-trained encoder embedding')
         parser.add_argument('--encoder-embed-dim', type=int, metavar='N',
                             help='encoder embedding dimension')
+
         parser.add_argument('--encoder-ffn-embed-dim', type=int, metavar='N',
                             help='encoder embedding dimension for FFN')
         parser.add_argument('--encoder-layers', type=int, metavar='N',
@@ -173,7 +174,11 @@ class TransformerModel(FairseqEncoderDecoderModel):
         parser.add_argument('--quant-noise-scalar', type=float, metavar='D', default=0,
                             help='scalar quantization noise and scalar quantization at training time')
         # fmt: on
-
+        
+        parser.add_argument('--feature-embed-dim', type=int, metavar='N',
+                            help='feature embedding dimension')
+        parser.add_argument('--feature-merge', type=str, metavar='STR', default=None, 
+                            help='feature merging method')
     @classmethod
     def build_model(cls, args, task):
         """Build a new model instance."""
@@ -192,7 +197,30 @@ class TransformerModel(FairseqEncoderDecoderModel):
             args.max_target_positions = DEFAULT_MAX_TARGET_POSITIONS
 
         src_dict, tgt_dict = task.source_dictionary, task.target_dictionary
+        feature_dict = task.feature_dictionary
+        
+        if args.feature_merge == "concat":
+        
+            feature_embed_dim = getattr(args, "feature_embed_dim", min(128, int(feature_dict.__len__()*0.7) + (8 - int(feature_dict.__len__()*0.7)% 8)))
+            
+            setattr(args, "encoder_embed_dim", args.encoder_embed_dim + feature_embed_dim)
+            setattr(args, "decoder_embed_dim", args.decoder_embed_dim + feature_embed_dim)
 
+        elif args.feature_merge == "add":
+        
+            feature_embed_dim = args.encoder_embed_dim
+        
+        elif args.feature_merge == "gate":
+            
+            feature_embed_dim = args.encoder_embed_dim
+            
+        elif args.feature_merge is not None:
+            raise ValueError(
+                    "correct featrue merge"
+                    )
+        else:
+            feature_embed_dim =None
+        
         if args.share_all_embeddings:
             if src_dict != tgt_dict:
                 raise ValueError("--share-all-embeddings requires a joined dictionary")
@@ -212,15 +240,32 @@ class TransformerModel(FairseqEncoderDecoderModel):
             decoder_embed_tokens = encoder_embed_tokens
             args.share_decoder_input_output_embed = True
         else:
-            encoder_embed_tokens = cls.build_embedding(
-                args, src_dict, args.encoder_embed_dim, args.encoder_embed_path
-            )
+        
+            if args.feature_merge == "concat":
+                encoder_embed_tokens = cls.build_embedding(
+                    args, src_dict, (args.encoder_embed_dim - feature_embed_dim), args.encoder_embed_path
+                )
+            else:
+                encoder_embed_tokens = cls.build_embedding(
+                    args, src_dict, (args.encoder_embed_dim), args.encoder_embed_path
+                )
+                
             decoder_embed_tokens = cls.build_embedding(
-                args, tgt_dict, args.decoder_embed_dim, args.decoder_embed_path
+                args, tgt_dict, (args.decoder_embed_dim), args.decoder_embed_path
             )
+            
+        if feature_dict != None:
+            feature_embed_tokens  = cls.build_embedding(
+                    args, feature_dict, feature_embed_dim, None
+                )  
+        else:
+            feature_embed_tokens = None
+        
 
-        encoder = cls.build_encoder(args, src_dict, encoder_embed_tokens)
+        encoder = cls.build_encoder(args, src_dict, feature_dict, encoder_embed_tokens, feature_embed_tokens)
         decoder = cls.build_decoder(args, tgt_dict, decoder_embed_tokens)
+        
+        # print(encoder)
         return cls(args, encoder, decoder)
 
     @classmethod
@@ -236,8 +281,9 @@ class TransformerModel(FairseqEncoderDecoderModel):
         return emb
 
     @classmethod
-    def build_encoder(cls, args, src_dict, embed_tokens):
-        return TransformerEncoder(args, src_dict, embed_tokens)
+    def build_encoder(cls, args, src_dict, feature_dict, embed_tokens, feature_embed_tokens ):
+        
+        return TransformerEncoder(args, src_dict, feature_dict, embed_tokens, feature_embed_tokens)
 
     @classmethod
     def build_decoder(cls, args, tgt_dict, embed_tokens):
@@ -255,6 +301,7 @@ class TransformerModel(FairseqEncoderDecoderModel):
         src_tokens,
         src_lengths,
         prev_output_tokens,
+        features = None,
         return_all_hiddens: bool = True,
         features_only: bool = False,
         alignment_layer: Optional[int] = None,
@@ -266,9 +313,14 @@ class TransformerModel(FairseqEncoderDecoderModel):
         Copied from the base class, but without ``**kwargs``,
         which are not supported by TorchScript.
         """
-        encoder_out = self.encoder(
-            src_tokens, src_lengths=src_lengths, return_all_hiddens=return_all_hiddens
-        )
+        if features is not None:
+            encoder_out = self.encoder(
+                src_tokens, src_lengths=src_lengths, features=features, return_all_hiddens=return_all_hiddens
+            )
+        else:
+            encoder_out = self.encoder(
+                src_tokens, src_lengths=src_lengths,  return_all_hiddens=return_all_hiddens
+            )
         decoder_out = self.decoder(
             prev_output_tokens,
             encoder_out=encoder_out,
@@ -305,21 +357,31 @@ class TransformerEncoder(FairseqEncoder):
         embed_tokens (torch.nn.Embedding): input embedding
     """
 
-    def __init__(self, args, dictionary, embed_tokens):
+    def __init__(self, args, dictionary, feature_dict, embed_tokens, feature_embed_tokens):
         super().__init__(dictionary)
         self.register_buffer("version", torch.Tensor([3]))
-
+        
+        self.src_dict = dictionary
+        self.feature_dict = feature_dict
+        self.merging_method = args.feature_merge
+        
         self.dropout = args.dropout
         self.encoder_layerdrop = args.encoder_layerdrop
-
-        embed_dim = embed_tokens.embedding_dim
+        
+        if self.merging_method == "concat":
+            embed_dim = embed_tokens.embedding_dim +feature_embed_tokens.embedding_dim
+        else:
+            embed_dim = embed_tokens.embedding_dim
+            
         self.padding_idx = embed_tokens.padding_idx
         self.max_source_positions = args.max_source_positions
 
         self.embed_tokens = embed_tokens
+        self.feature_embed_tokens = feature_embed_tokens
 
-        self.embed_scale = 1.0 if args.no_scale_embedding else math.sqrt(embed_dim)
-
+        # self.embed_scale = 1.0 if args.no_scale_embedding else math.sqrt(embed_dim)
+        self.embed_scale = 1.0
+        
         self.embed_positions = (
             PositionalEmbedding(
                 args.max_source_positions,
@@ -357,15 +419,42 @@ class TransformerEncoder(FairseqEncoder):
             self.layernorm_embedding = LayerNorm(embed_dim)
         else:
             self.layernorm_embedding = None
+            
+            
+        if args.feature_merge =="gate":
+            self.gate_layer = Linear(embed_dim*2, embed_dim)
+            self.gate_sigmoid = torch.nn.Sigmoid()
 
     def build_encoder_layer(self, args):
         return TransformerEncoderLayer(args)
+        
+    def gate(self, x, sub_x):
+        x_concat = torch.cat((x,sub_x),-1)
+        context_gate = self.gate_sigmoid(self.gate_layer(x_concat))
+        return torch.add(context_gate * x, (1.- context_gate) * sub_x)         
 
-    def forward_embedding(self, src_tokens):
+
+    def forward_embedding(self, src_tokens, feature_tokens, ):
         # embed tokens and positions
-        x = embed = self.embed_scale * self.embed_tokens(src_tokens)
+        
+        if self.merging_method == "concat": 
+            x = embed = torch.cat((self.embed_tokens(src_tokens), self.feature_embed_tokens(feature_tokens)),-1)
+        elif self.merging_method == "add":
+            x = embed = torch.add(self.embed_tokens(src_tokens), self.feature_embed_tokens(feature_tokens))
+            # print('x', x.shape)
+        elif self.merging_method == "gate":
+            x = embed = self.gate(self.embed_tokens(src_tokens), self.feature_embed_tokens(feature_tokens))
+        else:
+            x = embed =self.embed_tokens(src_tokens)
+            # print("x", x.shape)
+            
+            
         if self.embed_positions is not None:
-            x = embed + self.embed_positions(src_tokens)
+            if self.merging_method is not None:
+                x = embed + self.embed_positions(embed[:,:,0])
+            else:
+                x = embed + self.embed_positions(src_tokens)
+            
         if self.layernorm_embedding is not None:
             x = self.layernorm_embedding(x)
         x = F.dropout(x, p=self.dropout, training=self.training)
@@ -373,7 +462,7 @@ class TransformerEncoder(FairseqEncoder):
             x = self.quant_noise(x)
         return x, embed
 
-    def forward(self, src_tokens, src_lengths, return_all_hiddens: bool = False):
+    def forward(self, src_tokens, src_lengths, features =None, return_all_hiddens: bool = False):
         """
         Args:
             src_tokens (LongTensor): tokens in the source language of shape
@@ -395,7 +484,24 @@ class TransformerEncoder(FairseqEncoder):
                   hidden states of shape `(src_len, batch, embed_dim)`.
                   Only populated if *return_all_hiddens* is True.
         """
-        x, encoder_embedding = self.forward_embedding(src_tokens)
+        
+        # print("features.shape",features.shape) #features.shape torch.Size([64, 44])
+        # exit()
+        
+        # for a,b in zip(src_tokens, features):
+            # print(self.src_dict.string(a))
+            # print(self.feature_dict.string(b))
+            # print()
+            
+        # exit()
+        
+        # economic 활 력 둔화 로 growth 률 이 1분 기에 전 분기 compared - 0.3% 를 record 하고 , 각 institutions 이 year growth 전 망치 를 2% 초반 대로 낮추고 as 금리 increase 은 쉽지 않다는 analysis 이 지배 적 was .
+        # <rep> <ori> <ori> <ori> <ori> <rep> <ori> <ori> <ori> <ori> <ori> <ori> <rep> <ori> <ori> <ori> <rep> <ori> <ori> <ori> <rep> <ori> <rep> <rep> <ori> <ori> <ori> <ori> <ori> <ori> <ori> <rep> <ori> <rep> <ori> <ori> <ori> <rep> <ori> <ori> <ori> <rep> <ori>
+
+        # government 는 주@@ 씨 가 피@@ 랍@@ was since 외교부 와 국방부 , 국가정보원 을 on 으로 tf 를 consists by 리비아 government 와 u.s. 프랑스 , 영국 government as 과 공조 by 주@@ 씨 의 신변 safety 에 나선 has is .
+        # <rep> <ori> <ori> <ori> <ori> <ori> <ori> <rep> <rep> <ori> <ori> <ori> <ori> <ori> <ori> <rep> <ori> <ori> <ori> <rep> <rep> <ori> <rep> <ori> <rep> <ori> <ori> <ori> <rep> <rep> <ori> <ori> <rep> <ori> <ori> <ori> <ori> <rep> <ori> <ori> <rep> <rep> <ori>
+
+        x, encoder_embedding = self.forward_embedding(src_tokens, features)
 
         # B x T x C -> T x B x C
         x = x.transpose(0, 1)

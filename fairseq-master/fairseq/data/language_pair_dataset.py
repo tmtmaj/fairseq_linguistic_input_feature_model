@@ -22,6 +22,7 @@ def collate(
     left_pad_target=False,
     input_feeding=True,
 ):
+    # exit()
     if len(samples) == 0:
         return {}
 
@@ -122,6 +123,20 @@ def collate(
 
             batch['alignments'] = alignments
             batch['align_weights'] = align_weights
+            
+    if samples[0].get("feature",None) is not None:
+        # print(samples[0]['feature'], samples[0]['feature'].shape) #tensor([4, 4, 5, 4, 4, 4, 5, 4, 5, 5, 5, 4, 4, 4, 4, 4, 4, 4, 4, 4, 5, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 2]) torch.Size([44])
+        # print("와오")
+        feature_tokens = merge('feature', left_pad=left_pad_source)
+        feature_tokens = feature_tokens.index_select(0, sort_order)
+        batch['net_input']['features'] = feature_tokens
+    else:
+        batch['net_input']['features'] = None
+        
+        # print(batch['feature'].shape, batch['net_input']['src_tokens'].shape) #torch.Size([64, 44]) torch.Size([64, 44])
+        
+        # exit()
+        
 
     return batch
 
@@ -163,6 +178,7 @@ class LanguagePairDataset(FairseqDataset):
         left_pad_source=True, left_pad_target=False,
         shuffle=True, input_feeding=True,
         remove_eos_from_source=False, append_eos_to_target=False,
+        feature_dataset=None,
         align_dataset=None,
         append_bos=False, eos=None,
         num_buckets=0,
@@ -185,6 +201,7 @@ class LanguagePairDataset(FairseqDataset):
         self.input_feeding = input_feeding
         self.remove_eos_from_source = remove_eos_from_source
         self.append_eos_to_target = append_eos_to_target
+        self.feature_dataset = feature_dataset
         self.align_dataset = align_dataset
         if self.align_dataset is not None:
             assert self.tgt_sizes is not None, "Both source and target needed when alignments are provided"
@@ -260,7 +277,13 @@ class LanguagePairDataset(FairseqDataset):
         }
         if self.align_dataset is not None:
             example['alignment'] = self.align_dataset[index]
+            
+        if self.feature_dataset is not None:
+            example['feature'] = self.feature_dataset[index]
+            
         return example
+        
+       
 
     def __len__(self):
         return len(self.src)
