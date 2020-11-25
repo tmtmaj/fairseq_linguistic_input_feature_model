@@ -13,14 +13,14 @@ cd fairseq
 pip install --editable ./
 ```
 
-Implemention env 
+My implemention env 
 
 Python Python 3.6.9 on linux  
 Pytorch 1.7.0+cu101
 
 # Tutorial 
 
-#### Data preprocess
+## Data preprocess
 
 we introduce the Korean-to-English translation where the NMT input is augmented with part-of-speech(POS) tags.
 
@@ -64,7 +64,7 @@ python /fairseq_linguistic_input_feature_model/fairseq-master/fairseq_cli/prepro
 
 ```
 
-#### Model Train
+## Model Train
 
 train model using fairseq-py
 
@@ -80,7 +80,7 @@ python /fairseq_linguistic_input_feature_model/fairseq-master/fairseq_cli/train.
     | tee -a  /fairseq_linguistic_input_feature_model/fairseq-master/tutorial_dataset/training.log \
 ```
 
-#### Translate
+## Translate
 
 ```
 python /fairseq_linguistic_input_feature_model/fairseq-master/fairseq_cli/generate.py \
@@ -98,9 +98,10 @@ parser.add_argument('--load-features', action='store_true',help='load the binari
 group.add_argument("--feature-suffix", metavar="FP", default=None, help="feature file suffix")
 ```
 
-`--feature-merge` Merge action for incorporating linguistic input features embeddings. Possible choices: concat, add, gate Default: None
+`--feature-merge` Merge action for incorporating linguistic input features embeddings.  
+Possible choices: concat, add, gate  Default: None
 
-#### Train a vanilla NMT model
+## Train a vanilla NMT model
 
 ```
 python /fairseq_linguistic_input_feature_model/fairseq-master/fairseq_cli/preprocess.py \
@@ -126,4 +127,29 @@ python /fairseq_linguistic_input_feature_model/fairseq-master/fairseq_cli/genera
     --source-lang ko --target-lang en \
     --path /fairseq_linguistic_input_feature_model/fairseq-master/tutorial_dataset/checkpoint_last.pt --beam 5 --nbest 1 --quiet 
 
+```
+
+# Reference
+
+```bibtex
+@inproceedings{sennrich-haddow-2016-linguistic,
+    title = "Linguistic Input Features Improve Neural Machine Translation",
+    author = "Sennrich, Rico  and
+      Haddow, Barry",
+    booktitle = "Proceedings of the First Conference on Machine Translation: Volume 1, Research Papers",
+    month = aug,
+    year = "2016",
+    address = "Berlin, Germany",
+    publisher = "Association for Computational Linguistics",
+    url = "https://www.aclweb.org/anthology/W16-2209",
+    doi = "10.18653/v1/W16-2209",
+    pages = "83--91",
+}
+
+@inproceedings{ott2019fairseq,
+  title = {fairseq: A Fast, Extensible Toolkit for Sequence Modeling},
+  author = {Myle Ott and Sergey Edunov and Alexei Baevski and Angela Fan and Sam Gross and Nathan Ng and David Grangier and Michael Auli},
+  booktitle = {Proceedings of NAACL-HLT 2019: Demonstrations},
+  year = {2019},
+}
 ```
