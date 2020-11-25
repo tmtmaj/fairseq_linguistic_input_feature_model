@@ -98,7 +98,8 @@ parser.add_argument('--load-features', action='store_true',help='load the binari
 group.add_argument("--feature-suffix", metavar="FP", default=None, help="feature file suffix")
 ```
 
-`--feature-merge` Merge action for incorporating linguistic input features embeddings. Possible choices: concat, add, gate Default: None
+`--feature-merge` Merge action for incorporating linguistic input features embeddings.  
+Possible choices: concat, add, gate  Default: None
 
 #### Train a vanilla NMT model
 
