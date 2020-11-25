@@ -108,8 +108,7 @@ class TransformerModel(FairseqEncoderDecoderModel):
                             help='path to pre-trained encoder embedding')
         parser.add_argument('--encoder-embed-dim', type=int, metavar='N',
                             help='encoder embedding dimension')
-        parser.add_argument('--feature-embed-dim', type=int, metavar='N',
-                            help='feature embedding dimension')
+
         parser.add_argument('--encoder-ffn-embed-dim', type=int, metavar='N',
                             help='encoder embedding dimension for FFN')
         parser.add_argument('--encoder-layers', type=int, metavar='N',
@@ -178,7 +177,7 @@ class TransformerModel(FairseqEncoderDecoderModel):
         
         parser.add_argument('--feature-embed-dim', type=int, metavar='N',
                             help='feature embedding dimension')
-        parser.add_argument('--feature-merge', default=None, action='store_true',
+        parser.add_argument('--feature-merge', type=str, metavar='STR', default=None, 
                             help='feature merging method')
     @classmethod
     def build_model(cls, args, task):
@@ -208,11 +207,11 @@ class TransformerModel(FairseqEncoderDecoderModel):
             setattr(args, "decoder_embed_dim", args.dcoder_embed_dim + feature_embed_dim)
             
             en
-        elif args.feature_merge == "average":
+        elif args.feature_merge == "add":
         
             feature_embed_dim = args.encoder_embed_dim
         
-        elif args.feature_merge == "gate"：
+        elif args.feature_merge == "gate":
             
             feature_embed_dim = args.encoder_embed_dim
             
@@ -354,11 +353,15 @@ class TransformerEncoder(FairseqEncoder):
         
         self.src_dict = dictionary
         self.feature_dict = feature_dict
+        self.merging_method = args.feature_merge
         
         self.dropout = args.dropout
         self.encoder_layerdrop = args.encoder_layerdrop
-
-        embed_dim = embed_tokens.embedding_dim + feature_embed_tokens.embedding_dim
+        
+        if self.merging_method == "concat":
+            embed_dim = embed_tokens.embedding_dim +feature_embed_tokens.embedding_dim
+        else:
+            embed_dim = embed_tokens.embedding_dim
         self.padding_idx = embed_tokens.padding_idx
         self.max_source_positions = args.max_source_positions
 
@@ -405,14 +408,35 @@ class TransformerEncoder(FairseqEncoder):
             self.layernorm_embedding = LayerNorm(embed_dim)
         else:
             self.layernorm_embedding = None
+            
+            
+        if args.feature_merge =="gate":
+            self.gate_layer = Linear(embed_dim*2, embed_dim)
+            self.gate_sigmoid = torch.nn.Sigmoid()
 
     def build_encoder_layer(self, args):
         return TransformerEncoderLayer(args)
-
-    def forward_embedding(self, src_tokens, feature_tokens):
-        # embed tokens and positions
-        x = embed = torch.cat((self.embed_tokens(src_tokens), self.feature_embed_tokens(feature_tokens)),-1)
         
+    def gate(self, x, sub_x):
+        x_concat = torch.cat((x,sub_x),-1)
+        context_gate = self.gate_sigmoid(self.gate_layer(x_concat))
+        return torch.add(context_gate * x, (1.- context_gate) * sub_x)         
+
+
+    def forward_embedding(self, src_tokens, feature_tokens, ):
+        # embed tokens and positions
+        
+        if self.merging_method == "concat": 
+            x = embed = torch.cat((self.embed_tokens(src_tokens), self.feature_embed_tokens(feature_tokens)),-1)
+        elif self.merging_method == "add":
+            x = embed = torch.add(self.embed_tokens(src_tokens), self.feature_embed_tokens(feature_tokens))
+            # print('x', x.shape)
+        elif self.merging_method == "gate":
+            x = embed = self.gate(self.embed_tokens(src_tokens), self.feature_embed_tokens(feature_tokens))
+        else:
+            x = embed =self.embed_tokens(src_tokens)
+            
+            
         if self.embed_positions is not None:
             x = embed + self.embed_positions(embed[:,:,0])
         if self.layernorm_embedding is not None:
