@@ -1,6 +1,6 @@
 # Introduction
 
-This repository is to reproduce _Linguistic Input Features Improve Neural Machine Translation_ in fairseq-seq.
+This repository is to reproduce _Linguistic Input Features Improve Neural Machine Translation_ in [fairseq-py](https://github.com/pytorch/fairseq/tree/master/fairseq).
 
 # Requirements and Installation
 
